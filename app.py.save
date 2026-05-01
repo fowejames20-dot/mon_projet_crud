@@ -1,0 +1,24 @@
+from flask import Flask, request, jsonify
+app =Flask(__name__)
+
+# Notre "Base de données" temporaire
+produits = [
+    {"id": 1, "nom": "Macabo", "prix": 500},
+    {"id": 2, "nom": "Arachides", "prix": 200} ]
+
+@app.route('/')
+def index():
+    return "<h1>Serveur de James opérationnel </h1><p>Allez sur /api/produits pour voir les données.</p>"
+# READ : Voir tout
+@app.route('/api/produits', methods=['GET'])
+def get_all():
+    return jsonify(produits)
+# CREATE : Ajouter (via un outil comme Postman ou Insomnia)
+@app.route('/api/produits', methods=['POST'])
+def create():
+    nouveau = request.get_json()
+    produits.append(nouveau)
+    return jsonify({"message": "Produit ajouté avec succès"}), 201
+if __name__ == '__main__':
+# host='0.0.0.0' est INDISPENSABLE pour être vu par les autres machines
+    app.run(host='0.0.0.0', port=5000, debug=True)
