@@ -16,21 +16,21 @@ def index():
     <h1 style='color: #2c3e50;'><b>Serveur de James opérationnel </b></h1>
     <p style='font-size: 1.2em;'>allez sur
     <a href='/api/data' style='color: #3498db; text-decoration: none; font-weight: bolt;'>/api/data</a>pour voir le registre.</p>
-    <form action="" method="post>
+    <form action="/submit" method="post">
     <label for="name">nom</label>
-    <input type="text" id="name" style ="color: blue;"placeholder="VOTRE NOM" required><br>
+    <input type="text" id="name" style ="color: blue;"placeholder="VOTRE NOM" required><br><br>
     <label for="prename">prenom</label
-    <input type="text" id="prename" style ="color: bleue;"placeholder="VOTRE PRENOM" required><br>
+    <input type="text" id="prename" style ="color: blue;" placeholder="VOTRE PRENOM" required><br><br>
     <label for="num">numero</label
-    <input type="tel" id="num" style ="color: blue;"placeholder="VOTRE NUMERO DE TELEPHONE" required><br>
+    <input type="tel" id="num" style ="color: blue;"placeholder="VOTRE NUMERO DE TELEPHONE" required><br><br>
     <label for="imp">impresson"</label>
-    <input type="text" id="imp" style ="color: blue;"placeholder="VOTRE IMPRESSION ICI"><br>
+    <input type="text" id="imp" style ="color: blue;"placeholder="VOTRE IMPRESSION ICI"><br><br>
     <label for="Avis">avis</label>
-    <input type="text"Avis" style ="color: blue;"placeholder="VOTRE AVIS ICI"><br>
+    <input type="text"Avis" style ="color: blue;"placeholder="VOTRE AVIS ICI"><br><br>
     <label for="mail">e-mail</label>
-    <input type="mail" id="mail" style ="color: blue;"placeholder"adresse mail nam@gmail.com"><br>
-    <buttun type="submit">ENVOYER</buttun>
-    <buttun tYpe="reset">ANNULER</buttun>
+    <input type="email" id="mail" style ="color: blue;"placeholder="adresse mail nam@gmail.com"><br>
+    <bottun type="submit">ENVOYER</button><br>
+    <bottun tYpe="reset">ANNULER</button>
     </form>
     <hr style='border: 0; border-top: 1.5px solid #eee; margin: 20px 0;'>
     <p style='background-color: #1877f2; padding: 10px;border-radius: 5px; display: inline-block;'>
