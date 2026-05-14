@@ -1,36 +1,31 @@
 from flask import Flask, request, jsonify, render_template
 from datetime import datetime
-import json
+from bson.objectid import ObjectId
+from pymongo import MongoClient
 import os
 import re
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
-
-# Configuration
-FICHIER_DONNEES = 'donnees.json'
 app.config['JSON_SORT_KEYS'] = False
 
+# ====== CONFIGURATION MongoDB ======
+
+MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb://localhost:27017/')
+try:
+    client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000)
+    client.admin.command('ping')  # Vérifier la connexion
+    db = client['crud_db']
+    registre_collection = db['registre']
+    commentaires_collection = db['commentaires']
+    print("✅ Connecté à MongoDB")
+except Exception as e:
+    print(f"❌ Erreur de connexion MongoDB : {e}")
+    db = None
+
 # ====== UTILITAIRES ======
-
-def charger_donnees():
-    """Charge les données depuis le fichier JSON"""
-    if os.path.exists(FICHIER_DONNEES):
-        try:
-            with open(FICHIER_DONNEES, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError) as e:
-            print(f"Erreur lors de la lecture : {e}")
-            return {"registre": [], "commentaires": []}
-    return {"registre": [], "commentaires": []}
-
-def sauvegarder_donnees(donnees):
-    """Sauvegarde les données dans le fichier JSON"""
-    try:
-        with open(FICHIER_DONNEES, 'w', encoding='utf-8') as f:
-            json.dump(donnees, f, indent=2, ensure_ascii=False)
-    except IOError as e:
-        print(f"Erreur lors de la sauvegarde : {e}")
-        raise
 
 def valider_email(email):
     """Validation du format email avec regex"""
@@ -39,7 +34,6 @@ def valider_email(email):
 
 def valider_telephone(telephone):
     """Validation basique du numéro de téléphone"""
-    # Enlever les espaces et tirets, vérifier qu'il y a au moins 10 chiffres
     clean_phone = telephone.replace(' ', '').replace('-', '').replace('.', '')
     return len(clean_phone) >= 10 and clean_phone.isdigit()
 
@@ -67,6 +61,30 @@ def nettoyer_donnees(donnees):
     """Nettoie les données en enlevant les espaces superflus"""
     return {k: str(v).strip() if isinstance(v, str) else v for k, v in donnees.items()}
 
+def get_next_user_id():
+    """Obtient le prochain ID utilisateur"""
+    dernier = registre_collection.find_one(sort=[("id", -1)])
+    return (dernier['id'] + 1) if dernier else 1
+
+def get_next_comment_id():
+    """Obtient le prochain ID commentaire"""
+    dernier = commentaires_collection.find_one(sort=[("id", -1)])
+    return (dernier['id'] + 1) if dernier else 1
+
+def convertir_objectid(obj):
+    """Convertit les ObjectId MongoDB en string pour JSON"""
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            if isinstance(value, ObjectId):
+                obj[key] = str(value)
+            elif isinstance(value, dict):
+                convertir_objectid(value)
+            elif isinstance(value, list):
+                for item in value:
+                    if isinstance(item, dict):
+                        convertir_objectid(item)
+    return obj
+
 # ====== ROUTES ======
 
 @app.route('/')
@@ -77,6 +95,9 @@ def accueil():
 def soumettre():
     """Traite la soumission du formulaire HTML"""
     try:
+        if db is None:
+            return render_template('erreur.html', message="Base de données indisponible"), 500
+        
         donnees = nettoyer_donnees(request.form.to_dict())
         requis = ['name', 'prename', 'num', 'mail']
         
@@ -84,28 +105,27 @@ def soumettre():
         if not valide:
             return render_template('erreur.html', message=erreur), 400
         
-        toutes_donnees = charger_donnees()
-        nouvel_id = len(toutes_donnees['registre']) + 1
-        
-        # Ajouter à registre
-        toutes_donnees['registre'].append({
+        # Créer le nouvel utilisateur
+        nouvel_id = get_next_user_id()
+        utilisateur = {
             "id": nouvel_id,
             "nom": donnees['name'],
             "prenom": donnees['prename'],
             "telephone": donnees['num'],
             "email": donnees['mail'],
             "date_creation": datetime.now().isoformat()
-        })
+        }
+        registre_collection.insert_one(utilisateur)
         
-        # Ajouter commentaires
-        toutes_donnees['commentaires'].append({
-            "id": len(toutes_donnees['commentaires']) + 1,
+        # Créer le commentaire associé
+        commentaire = {
+            "id": get_next_comment_id(),
             "user_id": nouvel_id,
             "impression": donnees.get('imp', ''),
             "avis": donnees.get('Avis', '')
-        })
+        }
+        commentaires_collection.insert_one(commentaire)
         
-        sauvegarder_donnees(toutes_donnees)
         return render_template('succes.html', user_id=nouvel_id)
     
     except Exception as e:
@@ -116,7 +136,16 @@ def soumettre():
 def obtenir_tous():
     """Retourne tous les enregistrements et commentaires"""
     try:
-        return jsonify(charger_donnees())
+        if db is None:
+            return jsonify({"erreur": "Base de données indisponible"}), 500
+        
+        registre = list(registre_collection.find({}, {'_id': 0}))
+        commentaires = list(commentaires_collection.find({}, {'_id': 0}))
+        
+        return jsonify({
+            "registre": registre,
+            "commentaires": commentaires
+        })
     except Exception as e:
         return jsonify({"erreur": str(e)}), 500
 
@@ -124,6 +153,9 @@ def obtenir_tous():
 def creer():
     """Crée un nouvel enregistrement via API"""
     try:
+        if db is None:
+            return jsonify({"erreur": "Base de données indisponible"}), 500
+        
         nouveau = request.get_json()
         if not nouveau:
             return jsonify({"erreur": "Corps de la requête vide"}), 400
@@ -135,21 +167,21 @@ def creer():
         if not valide:
             return jsonify({"erreur": erreur}), 400
         
-        toutes_donnees = charger_donnees()
-        nouvel_id = len(toutes_donnees['registre']) + 1
-        
+        nouvel_id = get_next_user_id()
         nouveau['id'] = nouvel_id
         nouveau['date_creation'] = datetime.now().isoformat()
-        toutes_donnees['registre'].append(nouveau)
         
-        toutes_donnees['commentaires'].append({
-            "id": len(toutes_donnees['commentaires']) + 1,
+        registre_collection.insert_one(nouveau)
+        
+        # Créer le commentaire associé
+        commentaire = {
+            "id": get_next_comment_id(),
             "user_id": nouvel_id,
             "impression": nouveau.get("impression", ""),
             "avis": nouveau.get("avis", "")
-        })
+        }
+        commentaires_collection.insert_one(commentaire)
         
-        sauvegarder_donnees(toutes_donnees)
         return jsonify({
             "message": "Données ajoutées avec succès",
             "id": nouvel_id,
@@ -164,8 +196,10 @@ def creer():
 def obtenir_un(user_id):
     """Retourne un utilisateur spécifique"""
     try:
-        toutes_donnees = charger_donnees()
-        utilisateur = next((u for u in toutes_donnees['registre'] if u['id'] == user_id), None)
+        if db is None:
+            return jsonify({"erreur": "Base de données indisponible"}), 500
+        
+        utilisateur = registre_collection.find_one({"id": user_id}, {'_id': 0})
         if not utilisateur:
             return jsonify({"erreur": "Utilisateur non trouvé"}), 404
         return jsonify(utilisateur)
@@ -176,8 +210,10 @@ def obtenir_un(user_id):
 def modifier(user_id):
     """Modifie un utilisateur existant"""
     try:
-        toutes_donnees = charger_donnees()
-        utilisateur = next((u for u in toutes_donnees['registre'] if u['id'] == user_id), None)
+        if db is None:
+            return jsonify({"erreur": "Base de données indisponible"}), 500
+        
+        utilisateur = registre_collection.find_one({"id": user_id})
         if not utilisateur:
             return jsonify({"erreur": "Utilisateur non trouvé"}), 404
         
@@ -200,13 +236,14 @@ def modifier(user_id):
         # Ne pas modifier l'ID ni la date de création
         mises_a_jour.pop('id', None)
         mises_a_jour.pop('date_creation', None)
+        mises_a_jour.pop('_id', None)
         
-        utilisateur.update(mises_a_jour)
-        sauvegarder_donnees(toutes_donnees)
+        registre_collection.update_one({"id": user_id}, {"$set": mises_a_jour})
+        utilisateur_mis_a_jour = registre_collection.find_one({"id": user_id}, {'_id': 0})
         
         return jsonify({
             "message": "Utilisateur modifié avec succès",
-            "utilisateur": utilisateur
+            "utilisateur": utilisateur_mis_a_jour
         }), 200
     
     except Exception as e:
@@ -217,18 +254,16 @@ def modifier(user_id):
 def supprimer(user_id):
     """Supprime un utilisateur et ses commentaires"""
     try:
-        toutes_donnees = charger_donnees()
+        if db is None:
+            return jsonify({"erreur": "Base de données indisponible"}), 500
         
-        # Vérifier que l'utilisateur existe
-        utilisateur = next((u for u in toutes_donnees['registre'] if u['id'] == user_id), None)
+        utilisateur = registre_collection.find_one({"id": user_id})
         if not utilisateur:
             return jsonify({"erreur": "Utilisateur non trouvé"}), 404
         
         # Supprimer l'utilisateur et ses commentaires
-        toutes_donnees['registre'] = [u for u in toutes_donnees['registre'] if u['id'] != user_id]
-        toutes_donnees['commentaires'] = [c for c in toutes_donnees['commentaires'] if c['user_id'] != user_id]
-        
-        sauvegarder_donnees(toutes_donnees)
+        registre_collection.delete_one({"id": user_id})
+        commentaires_collection.delete_many({"user_id": user_id})
         
         return jsonify({
             "message": f"Utilisateur {user_id} et ses commentaires ont été supprimés"
@@ -242,14 +277,14 @@ def supprimer(user_id):
 def obtenir_commentaires(user_id):
     """Retourne les commentaires d'un utilisateur"""
     try:
-        toutes_donnees = charger_donnees()
+        if db is None:
+            return jsonify({"erreur": "Base de données indisponible"}), 500
         
-        # Vérifier que l'utilisateur existe
-        utilisateur = next((u for u in toutes_donnees['registre'] if u['id'] == user_id), None)
+        utilisateur = registre_collection.find_one({"id": user_id})
         if not utilisateur:
             return jsonify({"erreur": "Utilisateur non trouvé"}), 404
         
-        commentaires = [c for c in toutes_donnees['commentaires'] if c['user_id'] == user_id]
+        commentaires = list(commentaires_collection.find({"user_id": user_id}, {'_id': 0}))
         return jsonify({"user_id": user_id, "commentaires": commentaires}), 200
     
     except Exception as e:
@@ -266,5 +301,5 @@ def erreur_serveur(error):
     return jsonify({"erreur": "Erreur serveur interne"}), 500
 
 if __name__ == '__main__':
-    # En production, changez debug=False
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    port = int(os.getenv('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
