@@ -18,19 +18,19 @@ def index():
     <a href='/api/data' style='color: #3498db; text-decoration: none; font-weight: bolt;'>/api/data</a>pour voir le registre.</p>
     <form action="/submit" method="post">
     <label for="name">nom</label>
-    <input type="text" id="name" style ="color: blue;"placeholder="VOTRE NOM" required><br><br>
-    <label for="prename">prenom</label
-    <input type="text" id="prename" style ="color: blue;" placeholder="VOTRE PRENOM" required><br><br>
-    <label for="num">numero</label
-    <input type="tel" id="num" style ="color: blue;"placeholder="VOTRE NUMERO DE TELEPHONE" required><br><br>
-    <label for="imp">impresson"</label>
-    <input type="text" id="imp" style ="color: blue;"placeholder="VOTRE IMPRESSION ICI"><br><br>
+    <input type="text" id="name" style ="color: black;" placeholder="VOTRE NOM" required><br><br>
+    <label for="prename">prenom</label>
+    <input type="text" id="prename" style ="color: black;" placeholder="VOTRE PRENOM" required><br><br>
+    <label for="num">numero</label>
+    <input type="tel" id="num" style ="color: black;" placeholder="VOTRE NUMERO DE TELEPHONE" required><br><br>
+    <label for="imp">impression"</label>
+    <input type="text" id="imp" style ="color: black;" placeholder="VOTRE IMPRESSION ICI"><br><br>
     <label for="Avis">avis</label>
-    <input type="text"Avis" style ="color: blue;"placeholder="VOTRE AVIS ICI"><br><br>
+    <input type="text" id="Avis" style ="color: black;" placeholder="VOTRE AVIS ICI"><br><br>
     <label for="mail">e-mail</label>
-    <input type="email" id="mail" style ="color: blue;"placeholder="adresse mail nam@gmail.com"><br>
-    <bottun type="submit">ENVOYER</button><br>
-    <bottun tYpe="reset">ANNULER</button>
+    <input type="email" id="mail" style ="color: black;" placeholder="adresse mail nam@gmail.com"><br>
+    <button type="submit" style ="color: blue;">ENVOYER</button><br><br>
+    <button type="reset" style ="color: blue;">ANNULER</button>
     </form>
     <hr style='border: 0; border-top: 1.5px solid #eee; margin: 20px 0;'>
     <p style='background-color: #1877f2; padding: 10px;border-radius: 5px; display: inline-block;'>
@@ -59,7 +59,7 @@ def submit():
     commentaires.append({
         "id": len(commentaires) + 1,
         "new_id": new_id,
-        "impression": impresion,
+        "impression": impression,
         "avis": avis
 })
     return """
